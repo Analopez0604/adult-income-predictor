@@ -230,9 +230,11 @@ def cargar_modelos():
     scaler = StandardScaler()
     X_sc = scaler.fit_transform(X)
 
+    from sklearn.calibration import CalibratedClassifierCV
     lr = LogisticRegression(max_iter=1000, random_state=42)
     lr.fit(X_sc, y)
-    dt = DecisionTreeClassifier(max_depth=6, random_state=42)
+    dt_base = DecisionTreeClassifier(max_depth=6, random_state=42)
+    dt = CalibratedClassifierCV(dt_base, cv=3, method='isotonic')
     dt.fit(X_sc, y)
 
     return lr, dt, scaler, encoders, X.columns.tolist()
@@ -455,30 +457,52 @@ if predecir:
         (col_g2, prob_dt, "Árbol de Decisión",   "#43a047"),
     ]:
         with col:
+            val = round(prob[1]*100, 1)
+            # Color dinámico según el valor
+            if val >= 60:
+                bar_color = "#43a047"
+            elif val >= 40:
+                bar_color = "#ffa726"
+            else:
+                bar_color = color
+
             fig = go.Figure(go.Indicator(
-                mode="gauge+number",
-                value=round(prob[1]*100, 1),
-                number={'suffix': '%', 'font': {'size': 32, 'color': 'white', 'family': 'Sora'}},
-                title={'text': nombre, 'font': {'size': 14, 'color': '#90caf9', 'family': 'Sora'}},
+                mode="gauge+number+delta",
+                value=val,
+                delta={'reference': 50, 'valueformat': '.1f',
+                       'increasing': {'color': '#43a047'},
+                       'decreasing': {'color': '#ef5350'}},
+                number={'suffix': '%', 'font': {'size': 36, 'color': 'white', 'family': 'Sora'},
+                        'valueformat': '.1f'},
+                title={'text': f"<b>{nombre}</b>", 'font': {'size': 13, 'color': '#90caf9', 'family': 'Sora'}},
                 gauge={
-                    'axis': {'range': [0, 100], 'tickcolor': '#555', 'tickfont': {'color': '#aaa'}},
-                    'bar': {'color': color, 'thickness': 0.25},
-                    'bgcolor': 'rgba(255,255,255,0.05)',
-                    'bordercolor': 'rgba(255,255,255,0.1)',
+                    'axis': {
+                        'range': [0, 100],
+                        'tickwidth': 1,
+                        'tickcolor': 'rgba(255,255,255,0.2)',
+                        'tickfont': {'color': 'rgba(255,255,255,0.4)', 'size': 10},
+                        'dtick': 25,
+                    },
+                    'bar': {'color': bar_color, 'thickness': 0.3},
+                    'bgcolor': 'rgba(255,255,255,0.03)',
+                    'borderwidth': 1,
+                    'bordercolor': 'rgba(255,255,255,0.08)',
                     'steps': [
-                        {'range': [0, 30],  'color': 'rgba(255,255,255,0.03)'},
-                        {'range': [30, 70], 'color': 'rgba(255,255,255,0.05)'},
-                        {'range': [70, 100],'color': 'rgba(255,255,255,0.03)'},
+                        {'range': [0,  25],  'color': 'rgba(239,83,80,0.08)'},
+                        {'range': [25, 50],  'color': 'rgba(255,167,38,0.06)'},
+                        {'range': [50, 75],  'color': 'rgba(67,160,71,0.06)'},
+                        {'range': [75, 100], 'color': 'rgba(67,160,71,0.12)'},
                     ],
                     'threshold': {
-                        'line': {'color': '#ff7043', 'width': 2},
-                        'thickness': 0.75, 'value': 50
+                        'line': {'color': 'rgba(255,255,255,0.5)', 'width': 2},
+                        'thickness': 0.8,
+                        'value': 50
                     }
                 }
             ))
             fig.update_layout(
-                height=240,
-                margin=dict(t=40, b=10, l=20, r=20),
+                height=260,
+                margin=dict(t=50, b=20, l=30, r=30),
                 paper_bgcolor='rgba(0,0,0,0)',
                 plot_bgcolor='rgba(0,0,0,0)',
                 font=dict(family='Sora')
